@@ -7,6 +7,8 @@ var express = require('express'),
 	create = require('./routes/create.js'),
 	study = require('./routes/study.js'),
 	admin = require('./routes/admin.js');
+var server = require('http').createServer();
+var io = require('socket.io')(server);
 
 var app = express();
 
@@ -87,3 +89,26 @@ app.post('/api/study/admin/notify/', admin.notifyParticipant);
 
 app.listen(process.env.MONGO_PORT);
 console.log('Listening on port 3002...');
+
+/**
+ * For alert generation.
+ */
+var count = 0;
+var status = false;
+io.on('connection', function (client) {
+    console.log("Got connection");
+});
+setInterval(function () {
+
+    io.sockets.emit('heartbeat',
+        {
+            status: status
+        });
+    count++;
+    if(count%6 == 0) {
+        status = true;
+    } else {
+        status = false;
+    }
+}, 6000);
+server.listen(4000)
