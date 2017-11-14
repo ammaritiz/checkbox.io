@@ -3,7 +3,7 @@ var crypto = require('crypto');
 var emailjs = require('emailjs/email');
 var models = require('./studyModel.js');
 var redis = require('redis');
-var client = redis.createClient(6379, '192.168.33.10', {});
+var client = redis.createClient(6379, 'redis', {});
 
 var Server = mongo.Server,
     Db = mongo.Db,
