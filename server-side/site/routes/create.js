@@ -2,8 +2,9 @@ var mongo = require('mongodb');
 var crypto = require('crypto');
 var emailjs = require('emailjs/email');
 var models = require('./studyModel.js');
+var redis = require('redis');
+var client = redis.createClient(6379, '192.168.33.12', {});
 
- 
 var Server = mongo.Server,
     Db = mongo.Db,
     BSON = mongo.BSONPure;
@@ -28,43 +29,51 @@ exports.createStudy = function(req, res) {
 
     var invitecode = req.body.invitecode; 
     var studyKind = req.body.studyKind;
+    client.get("disableCreate", function(err, value){
+     	if(value=="true"){
+		res.send({'error':'Create Survey Disabled'});
+		return;
+	}
+	else
+	{
+	    if( invitecode != "RESEARCH" )
+	    {
+		res.send({'error':'Invalid invitecode'});
+		return;
+	    }
 
-    if( invitecode != "RESEARCH" )
-    {
-        res.send({'error':'Invalid invitecode'});
-        return;
-    }
+	    basicCreate( req, res, studyKind ).onCreate( function(study)
+	    {
+		db.collection('studies', function(err, collection) 
+		{
+			if( err )
+				console.log( err );
 
-    basicCreate( req, res, studyKind ).onCreate( function(study)
-    {
-    	db.collection('studies', function(err, collection) 
-    	{
-    		if( err )
-    			console.log( err );
+			collection.insert(study, {safe:true}, function(err, result) 
+			{
+				console.log( err || "Study created: " + study._id );
 
-        	collection.insert(study, {safe:true}, function(err, result) 
-        	{
-        		console.log( err || "Study created: " + study._id );
+				if( err )
+				{
+					res.send({error: err });
+				}
+				else
+				{
+			    study.setPublicLink( study._id );
 
-        		if( err )
-        		{
-        			res.send({error: err });
-        		}
-        		else
-        		{
-                    study.setPublicLink( study._id );
+			    // update with new public link, and notify via email, redirect user to admin page.
+			    collection.update( {'_id' : study._id}, {'$set' : {'publicLink' : study.publicLink}},
+				function(err, result )
+			    {
+				sendStudyEmail( study );
+				res.send({admin_url: study.adminLink});
+			    });
+				}
+			});
 
-                    // update with new public link, and notify via email, redirect user to admin page.
-                    collection.update( {'_id' : study._id}, {'$set' : {'publicLink' : study.publicLink}},
-                        function(err, result )
-                    {
-                        sendStudyEmail( study );
-                        res.send({admin_url: study.adminLink});
-                    });
-        		}
-        	});
-
-        });
+		});
+	    });
+	}
     });
 };
 
